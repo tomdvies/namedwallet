@@ -22,3 +22,8 @@ Cargo.lock
 
 programmingbitcoin
 programming_bitcoin.pdf
+
+
+# Added by cargo
+
+/target
