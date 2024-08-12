@@ -37,76 +37,74 @@ fn sub_mod(a: u64, b: u64, m: u64) -> u64 {
 
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct FieldElement {
+pub struct FpElem {
     number: u64,
     prime: u64,
 }
 
-impl FieldElement {
-    pub fn new(number: u64, prime: u64) -> Result<Self, String> {
-        if !(number >= prime) {
-            return Ok(FieldElement { number, prime });
-        } else {
-            return Err("Element must be less than p".to_string());
-        }
+impl FpElem {
+    pub fn new(number: u64, prime: u64) -> Self{
+        assert!(number < prime, "Elements of Fp must be less than p");
+        FpElem { number, prime }
     }
 }
 
 pub trait Power {
-    fn powi(&self, exponent: i64) -> Self;
-    fn pow(&self, exponent: &Self) -> Self;
+    fn pow(&self, exponent: i64) -> Self;
+//    fn powm(&self, exponent: &Self) -> Self;
 }
 
-impl Power for FieldElement {
-    fn powi(&self, exponent: i64) -> Self {
-        FieldElement {
+impl Power for FpElem {
+    fn pow(&self, exponent: i64) -> Self {
+        FpElem {
             number: pow_mod(self.number, exponent, self.prime),
             prime: self.prime,
         }
     }
 
-    fn pow(&self, exponent: &Self) -> Self {
-        assert!(self.prime == exponent.prime, "Prime base must be the same");
-        FieldElement {
-            number: pow_mod(
-                self.number,
-                i64::try_from(exponent.number).unwrap(),
-                self.prime,
-            ),
-            prime: self.prime
-        }
-    }
+//    fn powm(&self, exponent: &Self) -> Self {
+//        assert!(self.prime == exponent.prime, "Prime base must be the same");
+//        FpElem {
+//            number: pow_mod(
+//                self.number,
+//                i64::try_from(exponent.number).unwrap(),
+//                self.prime,
+//            ),
+//            prime: self.prime
+//        }
+//    }
 }
 
-impl Sub for FieldElement {
-    type Output = FieldElement;
-    fn sub(self, toadd: FieldElement) -> FieldElement {
+impl Sub for FpElem {
+    type Output = FpElem;
+    fn sub(self, toadd: FpElem) -> FpElem {
         assert!(self.prime == toadd.prime, "Prime base must be the same");
-        FieldElement {
+        FpElem {
             number: sub_mod(self.number, toadd.number, self.prime),
             prime: self.prime,
         }
     }
 }
 
-impl Add for FieldElement {
-    type Output = FieldElement;
-    fn add(self, toadd: FieldElement) -> FieldElement {
+impl Add for FpElem {
+    type Output = FpElem;
+    fn add(self, toadd: FpElem) -> FpElem {
         assert!(self.prime == toadd.prime, "Prime base must be the same");
-        FieldElement {
+        FpElem {
             number: add_mod(self.number, toadd.number, self.prime),
             prime: self.prime,
         }
     }
 }
 
-impl Mul for FieldElement {
-    type Output = FieldElement;
-    fn mul(self, toadd: FieldElement) -> FieldElement {
+impl Mul for FpElem {
+    type Output = FpElem;
+    fn mul(self, toadd: FpElem) -> FpElem {
         assert!(self.prime == toadd.prime, "Prime base must be the same");
-        FieldElement {
+        FpElem {
             number: mul_mod(self.number, toadd.number, self.prime),
             prime: self.prime,
         }
     }
 }
+
