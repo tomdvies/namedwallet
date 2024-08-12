@@ -5,43 +5,47 @@ use crate::fpelem::*;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::{Add, Mul, Sub};
+extern crate primitive_types;
+use primitive_types::U512;
 
 pub fn test() {
     println!("hello");
-    let p: u64 = 23;
-    let prime = 223;
-    let a = FpElem::new(0,prime);
-    let b = FpElem::new(7,prime);
+    let p = U512::from(23);
+    let prime = U512::from(223);
+    let a = FpElem::new(U512::from(0), prime);
+    let b = FpElem::new(U512::from(7), prime);
     // (x1,y1)
-    let x1= FpElem::new(192,prime);
-    let y1= FpElem::new(105,prime);
-    let p1 = ECPoint::new(Some((x1,y1)),a,b);
+    let x1 = FpElem::new(U512::from(192), prime);
+    let y1 = FpElem::new(U512::from(105), prime);
+    let p1 = ECPoint::new(Some((x1, y1)), a, b);
     // (x2,y2)
-    let x2= FpElem::new(17,prime);
-    let y2= FpElem::new(56,prime);
-    let p2 = ECPoint::new(Some((x2,y2)),a,b);
+    let x2 = FpElem::new(U512::from(17), prime);
+    let y2 = FpElem::new(U512::from(56), prime);
+    let p2 = ECPoint::new(Some((x2, y2)), a, b);
 
     //let k = ECPoint::new(Some((-1.0, -1.0)), 5.0, 7.0);
     //let k2 = ECPoint::new(Some((-1.0, 1.0)), 5.0, 7.0);
-    println!("{:?}", p1);
-    println!("{:?}", p2);
-    println!("{:?}", p1+p2);
+    //println!("{:?}", p1 * U512::from(170000));
+    //println!("{:?}", p2);
+    //let mut p3 = ECPoint::new(None,a,b);
+    //for _ in 0..170000{ p3 = p3 + p1 }
+    //println!("{:?}", p3);
 }
 
 // I feel there must be a way to define generics generically, and reuse them but im not sure what
 // that would look like :(
 
-// for testing with elliptic curves on R
-impl Power for f64 {
-    fn pow(&self, exponent: i64) -> Self {
-        f64::powi(*self, i32::try_from(exponent).unwrap())
-    }
-}
-
 #[derive(PartialEq, Clone, Copy)]
 pub struct ECPoint<FE>
 where
-    FE: Add<Output = FE> + Sub<Output = FE> + Mul<Output = FE> + Power + Copy + Debug + PartialEq,
+    FE: Add<Output = FE>
+        + Sub<Output = FE>
+        + Mul<U512, Output = FE>
+        + Mul<Output = FE>
+        + Power
+        + Copy
+        + Debug
+        + PartialEq,
 {
     // None = infinity here
     position: Option<(FE, FE)>,
@@ -51,7 +55,14 @@ where
 
 impl<FE> Debug for ECPoint<FE>
 where
-    FE: Add<Output = FE> + Sub<Output = FE> + Mul<Output = FE> + Power + Copy + Debug + PartialEq,
+    FE: Add<Output = FE>
+        + Sub<Output = FE>
+        + Mul<U512, Output = FE>
+        + Mul<Output = FE>
+        + Power
+        + Copy
+        + Debug
+        + PartialEq,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((x, y)) = self.position {
@@ -75,12 +86,19 @@ where
 
 impl<FE> ECPoint<FE>
 where
-    FE: Add<Output = FE> + Sub<Output = FE> + Mul<Output = FE> + Power + Copy + Debug + PartialEq,
+    FE: Add<Output = FE>
+        + Sub<Output = FE>
+        + Mul<U512, Output = FE>
+        + Mul<Output = FE>
+        + Power
+        + Copy
+        + Debug
+        + PartialEq,
 {
     pub fn new(position: Option<(FE, FE)>, a: FE, b: FE) -> Self {
         if let Some((x, y)) = position {
             assert!(
-                y.pow(2) == x.pow(3) + a * x + b,
+                y.pow(U512::from(2)) == x.pow(U512::from(3)) + a * x + b,
                 "Point must lie on the curve"
             );
             ECPoint { position, a, b }
@@ -88,19 +106,18 @@ where
             ECPoint { position, a, b }
         }
     }
-
-    fn mul_field_elem(self, elem: FE, scalar: u64) -> FE {
-        let mut out = elem.clone();
-        for _ in 0..scalar - 1 {
-            out = out + elem;
-        }
-        out
-    }
 }
 
 impl<FE> Add for ECPoint<FE>
 where
-    FE: Add<Output = FE> + Sub<Output = FE> + Mul<Output = FE> + Power + Copy + Debug + PartialEq,
+    FE: Add<Output = FE>
+        + Sub<Output = FE>
+        + Mul<U512, Output = FE>
+        + Mul<Output = FE>
+        + Power
+        + Copy
+        + Debug
+        + PartialEq,
 {
     type Output = ECPoint<FE>;
     fn add(self, toadd: Self) -> ECPoint<FE> {
@@ -110,9 +127,9 @@ where
         );
         if let (Some((x1, y1)), Some((x2, y2))) = (self.position, toadd.position) {
             if (x1, y1) == (x2, y2) {
-                let s = (self.mul_field_elem(x1.pow(2), 3) + self.a)
-                    * (self.mul_field_elem(y1, 2).pow(-1));
-                let x3 = s.pow(2) - self.mul_field_elem(x1, 2);
+                let s =
+                    (x1.pow(U512::from(2)) * U512::from(3) + self.a) * ((y1 * U512::from(2)).inv());
+                let x3 = s.pow(U512::from(2)) - (x1 * U512::from(2));
                 let y3 = s * (x1 - x3) - y1;
                 return ECPoint {
                     position: Some((x3, y3)),
@@ -126,8 +143,8 @@ where
                     b: self.b,
                 };
             } else {
-                let s = (y2 - y1) * ((x2 - x1).pow(-1));
-                let x3 = s.pow(2) - x1 - x2;
+                let s = (y2 - y1) * ((x2 - x1).inv());
+                let x3 = s.pow(U512::from(2)) - x1 - x2;
                 let y3 = s * (x1 - x3) - y1;
                 return ECPoint {
                     position: Some((x3, y3)),
@@ -149,5 +166,32 @@ where
             };
         }
         self.clone()
+    }
+}
+
+impl<FE> Mul<U512> for ECPoint<FE>
+where
+    FE: Add<Output = FE>
+        + Sub<Output = FE>
+        + Mul<U512, Output = FE>
+        + Mul<Output = FE>
+        + Power
+        + Copy
+        + Debug
+        + PartialEq,
+{
+    type Output = ECPoint<FE>;
+    fn mul(self, tomul: U512) -> ECPoint<FE> {
+        let mut exp = tomul;
+        let mut result = ECPoint{position:None, a:self.a, b:self.b};
+        let mut current = self.clone();
+        while exp != U512::zero(){
+            if exp % U512::from(2) == U512::one(){
+                result = result + current;
+            }
+            current = current +  current;
+            exp = exp >> 1;
+        }
+        result
     }
 }

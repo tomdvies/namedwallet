@@ -1,78 +1,98 @@
 use std::ops::{Add, Mul, Sub};
+extern crate primitive_types;
+use primitive_types::U512;
 
-// https://stackoverflow.com/questions/45918104/how-to-do-arithmetic-modulo-another-number-without-overflow
-fn mul_mod(a: u64, b: u64, m: u64) -> u64 {
-    let (a, b, m) = (a as u128, b as u128, m as u128);
-    ((a * b) % m) as u64
+// none of these are overflow safe - v bad
+fn mul_mod(a: U512, b: U512, m: U512) -> U512 {
+    if let Some(x) = a.checked_mul(b) {
+        return x % m;
+    } else {
+        panic!("Overflow in mul_mod");
+    }
 }
 
 // assumes prime base - see FlittleT, also UofCambridge QIC sheet 3 lol
-fn pow_mod(mut base: u64, exp: i64, modulus: u64) -> u64 {
-    let mut exp = (exp.rem_euclid(i64::try_from(modulus).unwrap()-1)) as u128;
-    if modulus == 1 {
-        return 0;
+fn pow_mod(mut base: U512, exp: U512, modulus: U512) -> U512 {
+    let mut exp = exp % (modulus - 1);
+    if modulus == U512::one() {
+        return U512::zero();
     }
-    let mut result = 1;
+    let mut result = U512::one();
     base = base % modulus;
-    while exp > 0 {
-        if exp % 2 == 1 {
-            result = result * base % modulus;
+    while exp > U512::zero() {
+        // apply leading bit
+        if exp % U512::from(2) == U512::one() {
+            result = mul_mod(result, base, modulus);
         }
+        // chop off leading bit
         exp = exp >> 1;
-        base = base * base % modulus
+        base = mul_mod(base, base, modulus);
     }
     result
 }
 
-// u128 to avoid overflow as in mul_mod
-fn add_mod(a: u64, b: u64, m: u64) -> u64 {
-    let (a, b, m) = (a as u128, b as u128, m as u128);
-    ((a + b) % m) as u64
+// not overflow safe
+fn add_mod(a: U512, b: U512, m: U512) -> U512 {
+    if let Some(x) = a.checked_add(b) {
+        return x % m;
+    } else {
+        panic!("Overflow in add_mod")
+    }
 }
 
-fn sub_mod(a: u64, b: u64, m: u64) -> u64 {
-    let (a, b, m) = (a as i128, b as i128, m as i128);
-    ((a - b).rem_euclid(m)) as u64
+fn sub_mod(a: U512, b: U512, m: U512) -> U512 {
+    let a = a %m;
+    let b = b%m;
+    if let Some(x) = a.checked_sub(b){
+        return x % m;
+    }
+    else{
+        return a.overflowing_add(m).0.overflowing_sub(b).0 % m;        
+    }
 }
-
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct FpElem {
-    number: u64,
-    prime: u64,
+    number: U512,
+    prime: U512,
 }
 
 impl FpElem {
-    pub fn new(number: u64, prime: u64) -> Self{
+    pub fn new(number: U512, prime: U512) -> Self {
         assert!(number < prime, "Elements of Fp must be less than p");
         FpElem { number, prime }
     }
 }
 
 pub trait Power {
-    fn pow(&self, exponent: i64) -> Self;
-//    fn powm(&self, exponent: &Self) -> Self;
+    fn pow(&self, exponent: U512) -> Self;
+    fn inv(&self) -> Self;
+    //    fn powm(&self, exponent: &Self) -> Self;
 }
 
 impl Power for FpElem {
-    fn pow(&self, exponent: i64) -> Self {
+    fn pow(&self, exponent: U512) -> Self {
         FpElem {
             number: pow_mod(self.number, exponent, self.prime),
             prime: self.prime,
         }
     }
 
-//    fn powm(&self, exponent: &Self) -> Self {
-//        assert!(self.prime == exponent.prime, "Prime base must be the same");
-//        FpElem {
-//            number: pow_mod(
-//                self.number,
-//                i64::try_from(exponent.number).unwrap(),
-//                self.prime,
-//            ),
-//            prime: self.prime
-//        }
-//    }
+    fn inv(&self) -> Self{
+        FpElem{number:pow_mod(self.number, self.prime-U512::from(2), self.prime), prime: self.prime}
+    }
+
+    //    fn powm(&self, exponent: &Self) -> Self {
+    //        assert!(self.prime == exponent.prime, "Prime base must be the same");
+    //        FpElem {
+    //            number: pow_mod(
+    //                self.number,
+    //                i64::try_from(exponent.number).unwrap(),
+    //                self.prime,
+    //            ),
+    //            prime: self.prime
+    //        }
+    //    }
 }
 
 impl Sub for FpElem {
@@ -108,3 +128,12 @@ impl Mul for FpElem {
     }
 }
 
+impl Mul<U512> for FpElem {
+    type Output = FpElem;
+    fn mul(self, toadd: U512) -> FpElem {
+        FpElem {
+            number: mul_mod(self.number, toadd % self.prime, self.prime),
+            prime: self.prime,
+        }
+    }
+}
