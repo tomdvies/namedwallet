@@ -8,20 +8,37 @@ use std::ops::{Add, Mul, Sub};
 extern crate primitive_types;
 use primitive_types::U512;
 
+const SECP256K1_A:u32 = 0;
+const SECP256K1_B:u32 = 7;
+const SECP256K1_GX: &str = "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+const SECP256K1_GY: &str = "0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+const SECP256K1_P: &str = "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f";
+const SECP256K1_N: &str = "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
+
 pub fn test() {
-    println!("hello");
-    let p = U512::from(23);
-    let prime = U512::from(223);
-    let a = FpElem::new(U512::from(0), prime);
-    let b = FpElem::new(U512::from(7), prime);
-    // (x1,y1)
-    let x1 = FpElem::new(U512::from(192), prime);
-    let y1 = FpElem::new(U512::from(105), prime);
-    let p1 = ECPoint::new(Some((x1, y1)), a, b);
-    // (x2,y2)
-    let x2 = FpElem::new(U512::from(17), prime);
-    let y2 = FpElem::new(U512::from(56), prime);
-    let p2 = ECPoint::new(Some((x2, y2)), a, b);
+    let n = U512::from(SECP256K1_N);
+    let p = U512::from(SECP256K1_P);
+    let gx = U512::from(SECP256K1_GX);
+    let gy = U512::from(SECP256K1_GY);
+    let a = U512::from(SECP256K1_A);
+    let b = U512::from(SECP256K1_B);
+    let G = ECPoint::new(Some((FpElem::new(gx,p),FpElem::new(gy,p))), FpElem::new(a,p), FpElem::new(b,p));
+    println!("{:?}",G);
+    println!("{:?}",G*n);
+
+    //println!("hello");
+    //let p = U512::from(23);
+    //let prime = U512::from(223);
+    //let a = FpElem::new(U512::from(0), prime);
+    //let b = FpElem::new(U512::from(7), prime);
+    //// (x1,y1)
+    //let x1 = FpElem::new(U512::from(192), prime);
+    //let y1 = FpElem::new(U512::from(105), prime);
+    //let p1 = ECPoint::new(Some((x1, y1)), a, b);
+    //// (x2,y2)
+    //let x2 = FpElem::new(U512::from(17), prime);
+    //let y2 = FpElem::new(U512::from(56), prime);
+    //let p2 = ECPoint::new(Some((x2, y2)), a, b);
 
     //let k = ECPoint::new(Some((-1.0, -1.0)), 5.0, 7.0);
     //let k2 = ECPoint::new(Some((-1.0, 1.0)), 5.0, 7.0);
@@ -106,6 +123,8 @@ where
             ECPoint { position, a, b }
         }
     }
+
+//    pub fn new_S256
 }
 
 impl<FE> Add for ECPoint<FE>
