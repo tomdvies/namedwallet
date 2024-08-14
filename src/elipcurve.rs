@@ -1,5 +1,5 @@
 // https://math.uchicago.edu/~may/REU2020/REUPapers/Shevchuk.pdf
-// based loosely on the above paper
+// algebraics based loosely on the above paper
 
 use crate::fpelem::*;
 use std::fmt;
@@ -8,8 +8,8 @@ use std::ops::{Add, Mul, Sub};
 extern crate primitive_types;
 use primitive_types::U512;
 
-const SECP256K1_A:u32 = 0;
-const SECP256K1_B:u32 = 7;
+const SECP256K1_A: u32 = 0;
+const SECP256K1_B: u32 = 7;
 const SECP256K1_GX: &str = "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 const SECP256K1_GY: &str = "0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
 const SECP256K1_P: &str = "0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f";
@@ -22,9 +22,13 @@ pub fn test() {
     let gy = U512::from(SECP256K1_GY);
     let a = U512::from(SECP256K1_A);
     let b = U512::from(SECP256K1_B);
-    let G = ECPoint::new(Some((FpElem::new(gx,p),FpElem::new(gy,p))), FpElem::new(a,p), FpElem::new(b,p));
-    println!("{:?}",G);
-    println!("{:?}",G*n);
+    let g = ECPoint::new(
+        Some((FpElem::new(gx, p), FpElem::new(gy, p))),
+        FpElem::new(a, p),
+        FpElem::new(b, p),
+    );
+    println!("{:?}", g);
+    println!("{:?}", g * n);
 
     //println!("hello");
     //let p = U512::from(23);
@@ -70,32 +74,24 @@ where
     b: FE,
 }
 
-impl<FE> Debug for ECPoint<FE>
-where
-    FE: Add<Output = FE>
-        + Sub<Output = FE>
-        + Mul<U512, Output = FE>
-        + Mul<Output = FE>
-        + Power
-        + Copy
-        + Debug
-        + PartialEq,
-{
+impl Debug for ECPoint<FpElem> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((x, y)) = self.position {
             return f
-                .debug_struct("Point")
-                .field("pos", &(x, y))
-                .field("a", &self.a)
-                .field("b", &self.b)
+                .debug_struct("ECPoint")
+                .field("pos", &(x.number, y.number))
+                .field("a", &self.a.number)
+                .field("b", &self.b.number)
+                .field("p", &self.a.prime)
                 .finish();
             //.field("b":self.b)
         } else {
             return f
-                .debug_struct("Point")
+                .debug_struct("ECPoint")
                 .field("pos", &"infinity")
-                .field("a", &self.a)
-                .field("b", &self.b)
+                .field("a", &self.a.number)
+                .field("b", &self.b.number)
+                .field("p", &self.a.prime)
                 .finish();
         }
     }
@@ -124,7 +120,23 @@ where
         }
     }
 
-//    pub fn new_S256
+    pub fn new_s256(position: Option<(U512, U512)>) -> ECPoint<FpElem>{
+        let p = U512::from(SECP256K1_P);
+        let a = U512::from(SECP256K1_A);
+        let b = U512::from(SECP256K1_B);
+        if let Some((x, y)) = position {
+            let out = ECPoint::new(
+                Some((FpElem::new(x, p), FpElem::new(y, p))),
+                FpElem::new(a, p),
+                FpElem::new(b, p),
+            );
+            return out;
+        } else {
+            let out = ECPoint::new(None, FpElem::new(a, p), FpElem::new(b, p));
+            return out;
+        }
+    }
+    //    pub fn new_S256
 }
 
 impl<FE> Add for ECPoint<FE>
@@ -184,7 +196,11 @@ where
                 b: self.b,
             };
         }
-        self.clone()
+        return ECPoint {
+            position: None,
+            a: self.a,
+            b: self.b,
+        };
     }
 }
 
@@ -202,13 +218,17 @@ where
     type Output = ECPoint<FE>;
     fn mul(self, tomul: U512) -> ECPoint<FE> {
         let mut exp = tomul;
-        let mut result = ECPoint{position:None, a:self.a, b:self.b};
-        let mut current = self.clone();
-        while exp != U512::zero(){
-            if exp % U512::from(2) == U512::one(){
+        let mut result = ECPoint {
+            position: None,
+            a: self.a,
+            b: self.b,
+        };
+        let mut current = self;
+        while exp != U512::zero() {
+            if (exp & U512::one()) != U512::zero() {
                 result = result + current;
             }
-            current = current +  current;
+            current = current + current;
             exp = exp >> 1;
         }
         result

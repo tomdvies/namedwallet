@@ -1,11 +1,14 @@
 mod fpelem;
-mod eccrypto;
+mod elipcurve;
 use fpelem::*;
+mod crypto;
 extern crate primitive_types;
 use primitive_types::U512;
+use std::ops::{Add, Mul, Sub, Rem, Div};
 
 fn main() {
-    eccrypto::test();
+    //println!("{:?}", mul_inv(a,b));
+    crypto::test();
     //let gx:U512 = U512::from("0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798");
     //println!("{:?}",gx);
     return;
