@@ -56,22 +56,41 @@ pub fn test() {
 // I feel there must be a way to define generics generically, and reuse them but im not sure what
 // that would look like :(
 
-#[derive(PartialEq, Clone, Copy)]
-pub struct ECPoint<FE>
-where
-    FE: Add<Output = FE>
-        + Sub<Output = FE>
-        + Mul<U512, Output = FE>
-        + Mul<Output = FE>
+pub trait GenericFieldElement:
+    Add<Output = Self>
+    + Sub<Output = Self>
+    + Mul<U512, Output = Self>
+    + Mul<Output = Self>
+    + Power
+    + Copy
+    + Debug
+    + PartialEq
+{
+}
+
+impl<T> GenericFieldElement for T where
+    T: Add<Output = Self>
+        + Sub<Output = Self>
+        + Mul<U512, Output = Self>
+        + Mul<Output = Self>
         + Power
         + Copy
         + Debug
-        + PartialEq,
+        + PartialEq
+{
+}
+
+
+#[derive(PartialEq, Clone, Copy)]
+pub struct ECPoint<FE>
 {
     // None = infinity here
     position: Option<(FE, FE)>,
     a: FE,
     b: FE,
+    // optional for if used for curve signatures
+    gen_position: Option<(FE, FE)>,
+    n: Option<U512>,
 }
 
 impl Debug for ECPoint<FpElem> {
@@ -97,16 +116,7 @@ impl Debug for ECPoint<FpElem> {
     }
 }
 
-impl<FE> ECPoint<FE>
-where
-    FE: Add<Output = FE>
-        + Sub<Output = FE>
-        + Mul<U512, Output = FE>
-        + Mul<Output = FE>
-        + Power
-        + Copy
-        + Debug
-        + PartialEq,
+impl<FE: GenericFieldElement> ECPoint<FE>
 {
     pub fn new(position: Option<(FE, FE)>, a: FE, b: FE) -> Self {
         if let Some((x, y)) = position {
@@ -114,13 +124,25 @@ where
                 y.pow(U512::from(2)) == x.pow(U512::from(3)) + a * x + b,
                 "Point must lie on the curve"
             );
-            ECPoint { position, a, b }
+            ECPoint {
+                position,
+                a,
+                b,
+                gen_position: None,
+                n: None,
+            }
         } else {
-            ECPoint { position, a, b }
+            ECPoint {
+                position,
+                a,
+                b,
+                gen_position: None,
+                n: None,
+            }
         }
     }
 
-    pub fn new_s256(position: Option<(U512, U512)>) -> ECPoint<FpElem>{
+    pub fn new_s256(position: Option<(U512, U512)>) -> ECPoint<FpElem> {
         let p = U512::from(SECP256K1_P);
         let a = U512::from(SECP256K1_A);
         let b = U512::from(SECP256K1_B);
@@ -139,16 +161,7 @@ where
     //    pub fn new_S256
 }
 
-impl<FE> Add for ECPoint<FE>
-where
-    FE: Add<Output = FE>
-        + Sub<Output = FE>
-        + Mul<U512, Output = FE>
-        + Mul<Output = FE>
-        + Power
-        + Copy
-        + Debug
-        + PartialEq,
+impl<FE: GenericFieldElement> Add for ECPoint<FE>
 {
     type Output = ECPoint<FE>;
     fn add(self, toadd: Self) -> ECPoint<FE> {
@@ -166,12 +179,16 @@ where
                     position: Some((x3, y3)),
                     a: self.a,
                     b: self.b,
+                    gen_position: self.gen_position,
+                    n: self.n,
                 };
             } else if x1 == x2 {
                 return ECPoint {
                     position: None,
                     a: self.a,
                     b: self.b,
+                    gen_position: self.gen_position,
+                    n: self.n,
                 };
             } else {
                 let s = (y2 - y1) * ((x2 - x1).inv());
@@ -181,6 +198,8 @@ where
                     position: Some((x3, y3)),
                     a: self.a,
                     b: self.b,
+                    gen_position: self.gen_position,
+                    n: self.n,
                 };
             }
         } else if let Some((_x, _y)) = self.position {
@@ -188,32 +207,29 @@ where
                 position: self.position.clone(),
                 a: self.a,
                 b: self.b,
+                gen_position: self.gen_position,
+                n: self.n,
             };
         } else if let Some((_x, _y)) = toadd.position {
             return ECPoint {
                 position: toadd.position.clone(),
                 a: self.a,
                 b: self.b,
+                gen_position: self.gen_position,
+                n: self.n,
             };
         }
         return ECPoint {
             position: None,
             a: self.a,
             b: self.b,
+            gen_position: self.gen_position,
+            n: self.n,
         };
     }
 }
 
-impl<FE> Mul<U512> for ECPoint<FE>
-where
-    FE: Add<Output = FE>
-        + Sub<Output = FE>
-        + Mul<U512, Output = FE>
-        + Mul<Output = FE>
-        + Power
-        + Copy
-        + Debug
-        + PartialEq,
+impl<FE: GenericFieldElement> Mul<U512> for ECPoint<FE>
 {
     type Output = ECPoint<FE>;
     fn mul(self, tomul: U512) -> ECPoint<FE> {
@@ -222,6 +238,8 @@ where
             position: None,
             a: self.a,
             b: self.b,
+            gen_position: self.gen_position,
+            n: self.n,
         };
         let mut current = self;
         while exp != U512::zero() {
